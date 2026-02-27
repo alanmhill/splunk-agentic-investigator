@@ -1,0 +1,35 @@
+# env
+.env
+.env.*
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# docker
+*.log
+*.pid
+
+# grafana generated files
+grafana_data/
+
+# postgres local files
+pg_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# splunk runtime
+splunk_etc/
+splunk_var/
+
+# splunk runtime (VERY important)
+splunk/local/*
+!splunk/local/README.md

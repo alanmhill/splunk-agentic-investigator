@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: Postgres (SecOps)
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: agentic_secops
+    user: agent
+    secureJsonData:
+      password: Postgr3_SecOps_123!
+    jsonData:
+      sslmode: "disable"
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: true
