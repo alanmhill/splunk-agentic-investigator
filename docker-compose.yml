@@ -30,7 +30,7 @@ services:
       - ./ollama-init.sh:/ollama-init.sh:ro
     entrypoint: ["/bin/sh", "/ollama-init.sh"]
     restart: "no"
-      
+
   splunk:
     image: splunk/splunk:latest
     container_name: splunk
@@ -82,7 +82,28 @@ services:
     depends_on:
       - postgres
 
+  agent-api:
+    build: ./agent
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      LLM_PROVIDER: ollama
+      LLM_MODEL: deepseek-r1
+      EMBEDDING_PROVIDER: ollama
+      EMBEDDING_MODEL: nomic-embed-text
+    depends_on:
+      - splunk
+      - postgres
+      - ollama
+      - ollama-init
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./agent:/app
+
 volumes:
+  ollama:
   splunk_etc:
   splunk_var:
   pg_data:
