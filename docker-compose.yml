@@ -54,6 +54,23 @@ services:
       timeout: 5s
       retries: 20
 
+  eventgen:
+    build:
+      context: ./eventgen
+    container_name: eventgen
+    environment:
+      - SPLUNK_HEC_URL=https://splunk:8088/services/collector
+      - SPLUNK_HEC_INSECURE=true
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+      - SPLUNK_INDEX=soc_sim
+      - SPLUNK_SOURCETYPE=winsec
+      - EPS=5
+      - SCENARIO=password_spray
+    depends_on:
+      splunk:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: pgvector
