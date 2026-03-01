@@ -37,6 +37,7 @@ services:
     environment:
       - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
       - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_SECRET=${SPLUNK_SECRET}
       - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
       - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
       - SPLUNK_HEC_ENABLE=true
@@ -47,7 +48,9 @@ services:
     volumes:
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
-      - ./splunk/local:/opt/splunk/etc/system/local
+      - ./splunk/local/inputs.conf:/opt/splunk/etc/system/local/inputs.conf:ro
+      - ./splunk/local/indexes.conf:/opt/splunk/etc/system/local/indexes.conf:ro
+
     healthcheck:
       test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/en-US/account/login || exit 1"]
       interval: 15s
@@ -109,6 +112,14 @@ services:
       LLM_MODEL: deepseek-r1
       EMBEDDING_PROVIDER: ollama
       EMBEDDING_MODEL: nomic-embed-text
+
+      SPLUNK_BASE_URL: https://splunk:8089
+      SPLUNK_USERNAME: admin
+      SPLUNK_PASSWORD: ${SPLUNK_PASSWORD}
+      SPLUNK_VERIFY_SSL: "false"
+      SPLUNK_HEC_URL: https://splunk:8088/services/collector
+      SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN}
+      SPLUNK_HEC_INSECURE: "true"
     depends_on:
       - splunk
       - postgres

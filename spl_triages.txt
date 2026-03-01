@@ -1,0 +1,70 @@
+Password Spray Detection
+
+index=soc_sim sourcetype=winsec event_code=4625 earliest=-15m
+| stats count as attempts, dc(user) as distinct_users, values(user) as targeted_users by src_ip
+| where distinct_users >= 5 AND attempts >= 10
+| sort -attempts
+
+
+Brute Force Detection
+
+index=soc_sim sourcetype=winsec event_code=4625 earliest=-15m
+| stats count as attempts by src_ip, user
+| where attempts >= 10
+| sort -attempts
+
+Credential Compormise
+
+index=soc_sim sourcetype=winsec earliest=-30m
+| stats count(eval(event_code=4625)) as fails,
+        count(eval(event_code=4624)) as success
+        by src_ip, user
+| where fails >= 5 AND success >= 1
+| sort -fails
+
+RDP Attack Monitoring
+
+index=soc_sim sourcetype=winsec event_code=4625 logon_type=10 earliest=-15m
+| stats count as rdp_failures by src_ip, dest_host
+| where rdp_failures >= 5
+| sort -rdp_failures
+
+Domain Controller Targeting
+
+index=soc_sim sourcetype=winsec event_code=4625 earliest=-15m
+| search dest_host="DC-*"
+| stats count as attempts, dc(user) as targeted_users by src_ip, dest_host
+| sort -attempts
+
+Account Lockout Detection
+
+index=soc_sim sourcetype=winsec event_code=4625 status=0xC0000234 earliest=-15m
+| stats count by user, src_ip
+| sort -count
+
+Privileged Account Monitoring
+
+index=soc_sim sourcetype=winsec event_code=4625 earliest=-15m
+| search user IN ("administrator","admin","svc_backup")
+| stats count by src_ip, user
+| sort -count
+
+Lateral Movement Pattern
+
+index=soc_sim sourcetype=winsec event_code=4624 earliest=-30m
+| stats dc(dest_host) as distinct_hosts by user
+| where distinct_hosts >= 3
+| sort -distinct_hosts
+
+External IP Detection
+
+index=soc_sim sourcetype=winsec event_code=4625 earliest=-15m
+| where NOT cidrmatch("10.0.0.0/8", src_ip)
+  AND NOT cidrmatch("192.168.0.0/16", src_ip)
+| stats count by src_ip
+| sort -count
+
+Spike Detection
+
+index=soc_sim sourcetype=winsec event_code=4625 earliest=-30m
+| timechart count span=1m

@@ -30,5 +30,12 @@ splunk_etc/
 splunk_var/
 
 # splunk runtime (VERY important)
-splunk/local/*
+# Never commit Splunk-generated secrets/state
+splunk/local/server.conf
+splunk/local/passwords.conf
+splunk/local/*.old
+splunk/local_BAD_*
 !splunk/local/README.md
+
+# Splunk local backup (contains generated/encrypted configs)
+splunk/local_BAD_*

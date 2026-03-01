@@ -6,3 +6,5 @@ psycopg2-binary
 pgvector
 langchain
 ollama
+pyyaml==6.0.2
+requests==2.32.3
