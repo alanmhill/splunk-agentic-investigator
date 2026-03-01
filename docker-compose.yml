@@ -112,11 +112,14 @@ services:
       LLM_MODEL: deepseek-r1
       EMBEDDING_PROVIDER: ollama
       EMBEDDING_MODEL: nomic-embed-text
-      
+
       SPLUNK_BASE_URL: https://splunk:8089
       SPLUNK_USERNAME: admin
       SPLUNK_PASSWORD: ${SPLUNK_PASSWORD}
       SPLUNK_VERIFY_SSL: "false"
+      SPLUNK_HEC_URL: https://splunk:8088/services/collector
+      SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN}
+      SPLUNK_HEC_INSECURE: "true"
     depends_on:
       - splunk
       - postgres
