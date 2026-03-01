@@ -118,3 +118,52 @@ with:
 -   Memory-aware investigation
 -   AI-assisted triage workflows
 -   Scalable, containerized security labs
+
+
+
+
+                        ┌─────────────────────────────┐
+                        │   Detection Pack (YAML)     │
+                        │  - SPL Templates            │
+                        │  - Parameters               │
+                        │  - Scoring Rules            │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │      Query Renderer         │
+                        │  - Resolves placeholders    │
+                        │  - Builds final SPL         │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │       Splunk REST API       │
+                        │        (Port 8089)          │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │     Detection Engine        │
+                        │  - Executes searches        │
+                        │  - Collects structured data │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │      Risk Scoring Layer     │
+                        │  - Deterministic scoring    │
+                        │  - Severity classification  │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │      Notable Emitter        │
+                        │        (HEC 8088)           │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │     index=soc_notables      │
+                        │  sourcetype=agent:notable  │
+                        └─────────────────────────────┘
