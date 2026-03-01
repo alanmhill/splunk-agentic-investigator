@@ -31,6 +31,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class SplunkClientError(Exception):
@@ -100,27 +103,23 @@ class SplunkClient:
             path = "/" + path
         return self.cfg.base_url + path
 
-    def create_search_job(
-        self,
-        spl: str,
-        earliest: Optional[str] = None,
-        latest: Optional[str] = None,
-        exec_mode: str = "normal",
-        max_time: int = 60,
-    ) -> str:
+    def create_search_job(self, spl: str, earliest: Optional[str] = None, latest: Optional[str] = None,
+                      exec_mode: str = "normal", max_time: int = 60) -> str:
         """
         Creates a search job and returns the SID.
         Uses: POST /servicesNS/{owner}/{app}/search/jobs
         """
-        if not spl.strip().startswith("search"):
-            # Splunk allows bare SPL, but prefixing is fine; we won't force it.
-            pass
+        query = spl.strip()
+
+        # REST endpoint expects 'search ...' unless you're starting with a pipe for generating commands.
+        if not query.startswith("search") and not query.startswith("|"):
+            query = "search " + query
 
         path = f"/servicesNS/{self.cfg.owner}/{self.cfg.app}/search/jobs"
         data = {
-            "search": spl,
+            "search": query,
             "output_mode": "json",
-            "exec_mode": exec_mode,  # "normal" or "blocking"
+            "exec_mode": exec_mode,
             "max_time": str(max_time),
         }
         if earliest:
@@ -172,29 +171,46 @@ class SplunkClient:
         self,
         sid: str,
         poll_interval: float = 0.5,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> Dict[str, Any]:
         """
-        Polls until dispatchState= DONE (or timeout). Returns final job payload.
+        Polls until job is done (or timeout). Splunk REST can report completion in
+        multiple ways depending on version/config:
+        - dispatchState == DONE
+        - isDone == 1
+        - doneProgress == 1.0
         """
         start = time.time()
         last_payload: Dict[str, Any] = {}
 
         while True:
             last_payload = self.get_job(sid)
-            try:
-                content = last_payload["entry"][0]["content"]
-                state = content.get("dispatchState") or content.get("dispatch_state")
-                is_done = state == "DONE"
-            except Exception:
-                # fallback: attempt best effort
-                is_done = False
 
-            if is_done:
+            content = {}
+            try:
+                content = last_payload.get("entry", [{}])[0].get("content", {}) or {}
+            except Exception:
+                content = {}
+
+            dispatch_state = (content.get("dispatchState") or content.get("dispatch_state") or "").upper()
+            is_done = content.get("isDone")  # often "1"
+            done_progress = content.get("doneProgress")  # often "1.0"
+
+            # Normalize
+            is_done_norm = str(is_done).strip().lower() in ("1", "true", "yes")
+            try:
+                done_progress_norm = float(done_progress) >= 1.0
+            except Exception:
+                done_progress_norm = False
+
+            if dispatch_state == "DONE" or is_done_norm or done_progress_norm:
                 return last_payload
 
             if time.time() - start > timeout:
-                raise SplunkClientError(f"Timed out waiting for search job {sid} to complete.")
+                raise SplunkClientError(
+                    f"Timed out waiting for search job {sid} to complete. "
+                    f"dispatchState={dispatch_state} isDone={is_done} doneProgress={done_progress}"
+                )
 
             time.sleep(poll_interval)
 
@@ -227,14 +243,14 @@ class SplunkClient:
     def run_search(
         self,
         spl: str,
-        wait_timeout: float = 30.0,
+        wait_timeout: float = 60.0,
         poll_interval: float = 0.5,
         results_count: int = 200,
     ) -> List[Dict[str, Any]]:
         """
         Convenience: create job -> wait -> results.
         """
-        sid = self.create_search_job(spl)
+        sid = self.create_search_job(spl, exec_mode="blocking", max_time=60)
         self.wait_for_done(sid, poll_interval=poll_interval, timeout=wait_timeout)
         return self.get_results(sid, count=results_count)
 

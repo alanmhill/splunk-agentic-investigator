@@ -30,15 +30,15 @@ detections:
     intent: ["triage", "detection"]
     schedule:
       interval_seconds: "{{run_interval_seconds}}"
-      lookback: "{{earliest}}"
+      lookback: "-15m"
     required_fields: ["src_ip", "user", "event_code"]
     parameters:
-      earliest: "{{earliest}}"
-      latest: "{{latest}}"
+      
+      
       distinct_users: "{{spray_distinct_users}}"
       min_attempts: "{{spray_min_attempts}}"
     spl: |
-      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      index={{index}} sourcetype={{sourcetype}} earliest="-15m" latest=now event_code=4625
       | stats count as attempts dc(user) as distinct_users values(user) as targeted_users by src_ip
       | where distinct_users >= {{distinct_users}} AND attempts >= {{min_attempts}}
       | sort -attempts
@@ -58,14 +58,14 @@ detections:
     intent: ["triage", "detection"]
     schedule:
       interval_seconds: "{{run_interval_seconds}}"
-      lookback: "{{earliest}}"
+      lookback: "-15m"
     required_fields: ["src_ip", "user", "event_code"]
     parameters:
-      earliest: "{{earliest}}"
-      latest: "{{latest}}"
+      
+      
       min_attempts: "{{brute_min_attempts}}"
     spl: |
-      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      index={{index}} sourcetype={{sourcetype}} earliest="-15m" latest=now event_code=4625
       | stats count as attempts by src_ip, user
       | where attempts >= {{min_attempts}}
       | sort -attempts
@@ -86,10 +86,10 @@ detections:
     required_fields: ["src_ip", "user", "event_code"]
     parameters:
       earliest: "-30m"
-      latest: "{{latest}}"
+      
       min_fails: "{{fail_then_success_min_fails}}"
     spl: |
-      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}}
+      index={{index}} sourcetype={{sourcetype}} earliest="-15m" latest=now
       | stats count(eval(event_code=4625)) as fails count(eval(event_code=4624)) as success by src_ip, user
       | where fails >= {{min_fails}} AND success >= 1
       | sort -fails
@@ -109,14 +109,14 @@ detections:
     intent: ["triage", "detection"]
     schedule:
       interval_seconds: "{{run_interval_seconds}}"
-      lookback: "{{earliest}}"
+      lookback: "-15m"
     required_fields: ["src_ip", "dest_host", "event_code", "logon_type"]
     parameters:
-      earliest: "{{earliest}}"
-      latest: "{{latest}}"
+      
+      
       min_attempts: "{{rdp_min_attempts}}"
     spl: |
-      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625 logon_type=10
+      index={{index}} sourcetype={{sourcetype}} earliest="-15m" latest=now event_code=4625 logon_type=10
       | stats count as rdp_failures values(user) as users by src_ip, dest_host
       | where rdp_failures >= {{min_attempts}}
       | sort -rdp_failures
@@ -136,14 +136,14 @@ detections:
     intent: ["triage", "detection"]
     schedule:
       interval_seconds: "{{run_interval_seconds}}"
-      lookback: "{{earliest}}"
+      lookback: "-15m"
     required_fields: ["src_ip", "dest_host", "event_code"]
     parameters:
-      earliest: "{{earliest}}"
-      latest: "{{latest}}"
+      
+      
       dc_host_pattern: "{{dc_host_pattern}}"
     spl: |
-      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      index={{index}} sourcetype={{sourcetype}} earliest="-15m" latest=now event_code=4625
       | search dest_host={{dc_host_pattern}}
       | stats count as attempts dc(user) as targeted_users by src_ip, dest_host
       | sort -attempts
@@ -160,14 +160,14 @@ detections:
     intent: ["triage", "detection"]
     schedule:
       interval_seconds: "{{run_interval_seconds}}"
-      lookback: "{{earliest}}"
+      lookback: "-15m"
     required_fields: ["src_ip", "user", "event_code"]
     parameters:
-      earliest: "{{earliest}}"
-      latest: "{{latest}}"
+      
+      
       vip_users: ["administrator", "admin", "svc_backup"]
     spl: |
-      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      index={{index}} sourcetype={{sourcetype}} earliest="-15m" latest=now event_code=4625
       | search user IN ({{vip_users}})
       | stats count as attempts by src_ip, user
       | sort -attempts
