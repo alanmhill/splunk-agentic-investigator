@@ -32,3 +32,6 @@ splunk_var/
 # splunk runtime (VERY important)
 splunk/local/*
 !splunk/local/README.md
+
+# Splunk local backup (contains generated/encrypted configs)
+splunk/local_BAD_*

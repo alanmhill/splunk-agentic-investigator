@@ -3,6 +3,8 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+COPY app/ ./app/
+COPY detections/ ./detections/
 
 # system deps (useful later for pgvector, http libs, etc)
 RUN apt-get update && apt-get install -y \

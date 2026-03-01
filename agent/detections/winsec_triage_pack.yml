@@ -1,0 +1,181 @@
+version: 1
+pack:
+  id: winsec_soc_triage_v1
+  name: "SOC Triage Pack (Windows Security) v1"
+  description: >
+    Agent-safe, parameterized SPL detections for triage of Windows Security-style auth activity.
+    Designed for soc_sim / winsec schema (event_code, logon_type, src_ip, dest_host, user, status).
+  owner: "splunk-agentic-investor"
+  tags: ["soc", "triage", "authentication", "winsec"]
+  defaults:
+    index: soc_sim
+    sourcetype: winsec
+    earliest: "-15m"
+    latest: "now"
+    dc_host_pattern: "DC-*"
+    spray_distinct_users: 5
+    spray_min_attempts: 10
+    brute_min_attempts: 10
+    rdp_min_attempts: 5
+    fail_then_success_min_fails: 5
+    lateral_min_hosts: 3
+    run_interval_seconds: 60
+
+detections:
+
+  - id: auth_password_spray
+    name: "Password Spray (one src_ip -> many users)"
+    category: authentication
+    severity_default: high
+    intent: ["triage", "detection"]
+    schedule:
+      interval_seconds: "{{run_interval_seconds}}"
+      lookback: "{{earliest}}"
+    required_fields: ["src_ip", "user", "event_code"]
+    parameters:
+      earliest: "{{earliest}}"
+      latest: "{{latest}}"
+      distinct_users: "{{spray_distinct_users}}"
+      min_attempts: "{{spray_min_attempts}}"
+    spl: |
+      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      | stats count as attempts dc(user) as distinct_users values(user) as targeted_users by src_ip
+      | where distinct_users >= {{distinct_users}} AND attempts >= {{min_attempts}}
+      | sort -attempts
+    returns: ["src_ip", "attempts", "distinct_users", "targeted_users"]
+    scoring:
+      base_risk: 60
+      boosts:
+        - when: "distinct_users >= ({{spray_distinct_users}} * 2)"
+          add: 20
+    narrative_template: >
+      Source IP {{src_ip}} generated {{attempts}} failed logons across {{distinct_users}} users (password spray pattern).
+
+  - id: auth_bruteforce_single_user
+    name: "Brute Force (one src_ip -> one user)"
+    category: authentication
+    severity_default: medium
+    intent: ["triage", "detection"]
+    schedule:
+      interval_seconds: "{{run_interval_seconds}}"
+      lookback: "{{earliest}}"
+    required_fields: ["src_ip", "user", "event_code"]
+    parameters:
+      earliest: "{{earliest}}"
+      latest: "{{latest}}"
+      min_attempts: "{{brute_min_attempts}}"
+    spl: |
+      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      | stats count as attempts by src_ip, user
+      | where attempts >= {{min_attempts}}
+      | sort -attempts
+    returns: ["src_ip", "user", "attempts"]
+    scoring:
+      base_risk: 50
+    narrative_template: >
+      Source IP {{src_ip}} generated {{attempts}} failed logons targeting user {{user}} (brute force pattern).
+
+  - id: auth_fail_then_success
+    name: "Credential Compromise (fails then success)"
+    category: authentication
+    severity_default: critical
+    intent: ["triage", "detection"]
+    schedule:
+      interval_seconds: "{{run_interval_seconds}}"
+      lookback: "-30m"
+    required_fields: ["src_ip", "user", "event_code"]
+    parameters:
+      earliest: "-30m"
+      latest: "{{latest}}"
+      min_fails: "{{fail_then_success_min_fails}}"
+    spl: |
+      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}}
+      | stats count(eval(event_code=4625)) as fails count(eval(event_code=4624)) as success by src_ip, user
+      | where fails >= {{min_fails}} AND success >= 1
+      | sort -fails
+    returns: ["src_ip", "user", "fails", "success"]
+    scoring:
+      base_risk: 90
+      boosts:
+        - when: "success >= 1"
+          add: 20
+    narrative_template: >
+      User {{user}} had {{fails}} failed logons followed by {{success}} successful logon(s) from {{src_ip}} (possible compromise).
+
+  - id: auth_rdp_failures
+    name: "RDP Failures (LogonType=10)"
+    category: authentication
+    severity_default: high
+    intent: ["triage", "detection"]
+    schedule:
+      interval_seconds: "{{run_interval_seconds}}"
+      lookback: "{{earliest}}"
+    required_fields: ["src_ip", "dest_host", "event_code", "logon_type"]
+    parameters:
+      earliest: "{{earliest}}"
+      latest: "{{latest}}"
+      min_attempts: "{{rdp_min_attempts}}"
+    spl: |
+      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625 logon_type=10
+      | stats count as rdp_failures values(user) as users by src_ip, dest_host
+      | where rdp_failures >= {{min_attempts}}
+      | sort -rdp_failures
+    returns: ["src_ip", "dest_host", "rdp_failures", "users"]
+    scoring:
+      base_risk: 70
+      boosts:
+        - when: 'like(dest_host, "{{dc_host_pattern}}")'
+          add: 30
+    narrative_template: >
+      {{rdp_failures}} RDP failed logons from {{src_ip}} to {{dest_host}} involving users={{users}}.
+
+  - id: auth_dc_targeting
+    name: "Domain Controller Targeting (failed logons to DCs)"
+    category: authentication
+    severity_default: high
+    intent: ["triage", "detection"]
+    schedule:
+      interval_seconds: "{{run_interval_seconds}}"
+      lookback: "{{earliest}}"
+    required_fields: ["src_ip", "dest_host", "event_code"]
+    parameters:
+      earliest: "{{earliest}}"
+      latest: "{{latest}}"
+      dc_host_pattern: "{{dc_host_pattern}}"
+    spl: |
+      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      | search dest_host={{dc_host_pattern}}
+      | stats count as attempts dc(user) as targeted_users by src_ip, dest_host
+      | sort -attempts
+    returns: ["src_ip", "dest_host", "attempts", "targeted_users"]
+    scoring:
+      base_risk: 75
+    narrative_template: >
+      Failed logon activity targeting domain controller {{dest_host}} from {{src_ip}} (attempts={{attempts}}, users={{targeted_users}}).
+
+  - id: auth_vip_user_targeting
+    name: "VIP User Targeting (failed logons)"
+    category: authentication
+    severity_default: high
+    intent: ["triage", "detection"]
+    schedule:
+      interval_seconds: "{{run_interval_seconds}}"
+      lookback: "{{earliest}}"
+    required_fields: ["src_ip", "user", "event_code"]
+    parameters:
+      earliest: "{{earliest}}"
+      latest: "{{latest}}"
+      vip_users: ["administrator", "admin", "svc_backup"]
+    spl: |
+      index={{index}} sourcetype={{sourcetype}} earliest={{earliest}} latest={{latest}} event_code=4625
+      | search user IN ({{vip_users}})
+      | stats count as attempts by src_ip, user
+      | sort -attempts
+    returns: ["src_ip", "user", "attempts"]
+    scoring:
+      base_risk: 80
+      boosts:
+        - when: "attempts >= 10"
+          add: 10
+    narrative_template: >
+      VIP account {{user}} was targeted by {{src_ip}} with {{attempts}} failed logons.
