@@ -8,7 +8,7 @@ datasources:
     database: agentic_secops
     user: agent
     secureJsonData:
-      password: your_postgres_password
+      password: Postgr3_SecOps_123!
     jsonData:
       sslmode: "disable"
       postgresVersion: 1600
